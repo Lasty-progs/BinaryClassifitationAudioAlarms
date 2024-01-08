@@ -1,34 +1,26 @@
 from scipy import signal
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
-import sys
-import librosa
+import librosa, os
+import pandas as pd
 
 
+CLASSIFICATION_CLASS = "Alarm" # Chose one class from vocabulary.csv
 NUM_TRAINING = 2560
 NUM_VALIDATION = 1168
 NUM_TESTING = 16
-svm_array_length = 3
 
 
-#  Parse the training .wav file names and their corresponding labels from train.txt
-def get_train_labels():
-    fd = open('train.txt')
-    file_names = []
-    labels = []
-    for line in fd.readlines():
-        info = line.strip('\n').split(',')
-        file_names.append(info[0])
-        labels.append(info[1])
-    fd.close()
-    return file_names, labels
+def get_file_names() -> dict:
+    files = {"dev":os.listdir("./FSD50K/" + "dev" + "_audio/"),
+             "eval":os.listdir("./FSD50K/" + "eval" + "_audio/")}
+    return files
 
 
-#  Parse the training .wav file names and their corresponding labels from validation.txt
-def get_validation_labels():
-    fd = open('validation.txt')
+
+def get_labels(file="train.txt"):
+    fd = open(file)
     file_names = []
     labels = []
     for line in fd.readlines():
@@ -74,8 +66,8 @@ def get_melspectrogram(path, fixed_width = 150, fixed_height = 150):
 
 #  This functions generates and saves the melspectrograms used by the neural network.
 def audio_to_images_librosa():
-    training_file_names, training_labels = get_train_labels()
-    validation_file_names, validation_labels = get_validation_labels()
+    training_file_names, training_labels = get_labels("train.txt")
+    validation_file_names, validation_labels = get_labels("validation.txt")
     testing_file_names = get_testing_files()
 
     print('Generating melspectrograms for training...')
