@@ -4,7 +4,6 @@ import pandas as pd
 
 
 CLASSIFICATION_CLASS = "Alarm" # Chose one class from vocabulary.csv
-NUM_TESTING = 16
 SIZE_IMAGES = (300,300)
 
 
@@ -82,12 +81,36 @@ def generate_folders():
 
 #  With the default width and height values, it generates a 150x150 melspectrogram.
 def get_melspectrogram(path, fixed_width = 150, fixed_height = 150):
+    '''Get melspectrogramm shaped for fix size'''
     signal, sample_rate = librosa.load(path, sr = 16000)
     hop_length = int(signal.shape[0] / (fixed_width * 1.1))
     spectrogram = librosa.feature.melspectrogram(y=signal, n_mels = fixed_height, hop_length = hop_length)
     spectrogram = librosa.power_to_db(spectrogram)
 
     return spectrogram[:, :fixed_width]
+
+def clear_empty(dataset, empty, size):
+    '''Clear empty data'''
+    cleared = np.zeros((len(dataset) - empty, size[0], size[1]))
+    zeroes = np.zeros((size[0], size[1]))
+    counter = 0
+    for i in dataset:
+        if i.any():
+            cleared[counter] = i
+            counter += 1 
+    return cleared
+
+def generate_melspectrogramms(file_names, size):
+    '''Get cleared melspecrogramms of all dataset'''
+    data = np.zeros((len(file_names), size[0], size[1]))
+    empty = 0
+    for i, file_name in enumerate(file_names):
+        try:
+            data[i] = get_melspectrogram(file_name, fixed_height=size[0], fixed_width=size[1])
+        except EOFError:
+            empty += 1
+    cleared = clear_empty(data, empty, size)
+    return cleared
 
 
 #  This functions generates and saves the melspectrograms used by the neural network.
@@ -97,26 +120,15 @@ def audio_to_images_librosa(size:tuple):
     testing_file_names = get_test_files()
     generate_folders()
 
-    # num_training, num_validation = count_true_examples(pd.read_csv("./FSD50K/ground_truth/dev.csv"),
-    #                                                    CLASSIFICATION_CLASS)
-
     print('Generating melspectrograms for training...')
-    training_images = np.zeros((len(training_labels), size[0], size[1]))
-    for i, file_name in enumerate(training_file_names):
-        training_images[i] = get_melspectrogram(file_name, fixed_height=size[0], fixed_width=size[1])
-
+    training_images = generate_melspectrogramms(training_file_names, size)
 
     print('Generating melspectrograms for validation...')
-    validation_images = np.zeros((len(validation_labels), size[0], size[1]))
-    for i, file_name in enumerate(validation_file_names):
-        validation_images[i] = get_melspectrogram(file_name, fixed_height=size[0], fixed_width=size[1])
+    validation_images = generate_melspectrogramms(validation_file_names, size)
 
 
     print('Generating melspectrograms for testing...')
-    testing_images = np.zeros((len(testing_file_names), size[0], size[1]))
-    for i, file_name in enumerate(testing_file_names):
-        testing_images[i] = get_melspectrogram(file_name, fixed_height=size[0], fixed_width=size[1])
-
+    testing_images = generate_melspectrogramms(testing_file_names, size)
 
     print('Saving melspectrograms...')
     #  Save images

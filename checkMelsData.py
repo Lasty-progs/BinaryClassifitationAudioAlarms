@@ -6,11 +6,11 @@ from scipy.signal import spectrogram
 
 
 
-train_img = np.load('temp/validation_mels_150/validation.npy')
+train_img = np.load('temp/validation_mels_150/validation.npy')[2]
 
-print(train_img.shape)
+# print(train_img.shape)
 
-# plt.imsave("test_mell.jpg", train_img, cmap='viridis')
+plt.imsave("test_mell.jpg", train_img, cmap='viridis')
 
 
 
