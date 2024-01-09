@@ -37,15 +37,6 @@ def write_predicted(testing_file_names, predictions, file_name):
         fd.write(testing_file_names[i] + ',' + str(x) + '\n')
     fd.close()
 
-# def get_testing_files():
-#     fd = open('test.txt')
-#     file_names = []
-#     for line in fd.readlines():
-#         info = line.strip('\n')
-#         file_names.append(info)
-#     fd.close()
-#     return file_names
-
 
 def load_train_data():
     train_images = np.load('temp/train_mels_150/train.npy')
@@ -78,17 +69,6 @@ def load_test_data():
     return test_images
 
 
-# ''' Function that outputs the confusion matrix for the predicted and real labels given '''
-# def get_confusion_matrix(predictions, labels):
-#     matrix = [[0, 0], [0, 0]]
-#     labels_f = labels.flatten()
-#     for i in range(len(predictions)):
-#         matrix[labels_f[i].item()][predictions[i].item()] += 1
-#     fd = open('conf_matrix.txt', 'w')
-#     fd.write(str(matrix[0][0]) + ' ' + str(matrix[0][1]) + ' ' + str(matrix[1][0]) + ' ' + str(matrix[1][1]))
-#     fd.close()
-
-
 
 def train_and_test():
     #  Load data from files
@@ -99,7 +79,6 @@ def train_and_test():
 
 
     #  Initialialize the normalization function
-    # norm = transforms.Normalize(mean = [-47.41110035071766], std = [21.863642215782225])
     # because there are significantly more objects
     m = np.load('temp/test_mels_150/test.npy')
     norm = transforms.Normalize(mean = np.mean(m), std=np.std(m))
@@ -183,7 +162,6 @@ def train_and_test():
                 for j in range(index, index + batch_size):
                     predictions[j] = predicted[j - index]
                 index += batch_size
-        # get_confusion_matrix(predictions, validation_labels)
         
         lb = validation_labels.reshape(predictions.shape)
         f1 = binary_f1_score(predictions.cuda(), lb.cuda())
@@ -201,7 +179,6 @@ def train_and_test():
         
         print()
         scheduler.step()
-
 
 
 
