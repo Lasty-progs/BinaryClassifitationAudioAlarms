@@ -7,21 +7,24 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 import vgg  #  the file containing our network architecture
-import data_formatter
 from torcheval.metrics.functional import binary_f1_score, binary_auroc
 import matplotlib.pyplot as plt
+from data_formatter import get_test_files
+from data_formatter import SIZE_IMAGES
 
 '''  Handle the number of batches used for each step '''
-image_size = 150
-train_samples = 2560
-validation_samples = 1168
-test_samples = 16
-batch_size = 8
+
+epochs = 40
+
+
+train_samples, validation_samples, test_samples = np.load('temp/len.npy')
+
+batch_size = 1
 train_batches = train_samples // batch_size
 validation_batches = validation_samples // batch_size
 test_batches = test_samples // batch_size
+image_size = SIZE_IMAGES[0]
 
-epochs = 50
 
 
 
@@ -34,23 +37,23 @@ def write_predicted(testing_file_names, predictions, file_name):
         fd.write(testing_file_names[i] + ',' + str(x) + '\n')
     fd.close()
 
-def get_testing_files():
-    fd = open('test.txt')
-    file_names = []
-    for line in fd.readlines():
-        info = line.strip('\n')
-        file_names.append(info)
-    fd.close()
-    return file_names
+# def get_testing_files():
+#     fd = open('test.txt')
+#     file_names = []
+#     for line in fd.readlines():
+#         info = line.strip('\n')
+#         file_names.append(info)
+#     fd.close()
+#     return file_names
 
 
 def load_train_data():
-    train_images = np.load('train_mels_150/train.npy')
+    train_images = np.load('temp/train_mels_150/train.npy')
     train_images = torch.from_numpy(train_images).float().cuda()
     
     train_images = train_images.reshape((train_batches, batch_size, 1, image_size, image_size))
 
-    train_labels = np.load('train_mels_150/train_labels.npy')
+    train_labels = np.load('temp/train_mels_150/train_labels.npy')
     train_labels = torch.from_numpy(train_labels).long().cuda()
     
     train_labels = train_labels.reshape((train_batches, batch_size))
@@ -58,32 +61,32 @@ def load_train_data():
 
 
 def load_validation_data():
-    validation_images = np.load('validation_mels_150/validation.npy')
+    validation_images = np.load('temp/validation_mels_150/validation.npy')
     validation_images = torch.from_numpy(validation_images).float().cuda()
     validation_images = validation_images.reshape((validation_batches, batch_size, 1, image_size, image_size))
 
-    validation_labels = np.load('validation_mels_150/validation_labels.npy')
+    validation_labels = np.load('temp/validation_mels_150/validation_labels.npy')
     validation_labels = torch.from_numpy(validation_labels).long().cuda()
     validation_labels = validation_labels.reshape((validation_batches, batch_size))
     return validation_images, validation_labels
 
 
 def load_test_data():
-    test_images = np.load('test_mels_150/test.npy')
+    test_images = np.load('temp/test_mels_150/test.npy')
     test_images = torch.from_numpy(test_images).float().cuda()
     test_images = test_images.reshape((test_batches, batch_size, 1, image_size, image_size))
     return test_images
 
 
-''' Function that outputs the confusion matrix for the predicted and real labels given '''
-def get_confusion_matrix(predictions, labels):
-    matrix = [[0, 0], [0, 0]]
-    labels_f = labels.flatten()
-    for i in range(len(predictions)):
-        matrix[labels_f[i].item()][predictions[i].item()] += 1
-    fd = open('conf_matrix.txt', 'w')
-    fd.write(str(matrix[0][0]) + ' ' + str(matrix[0][1]) + ' ' + str(matrix[1][0]) + ' ' + str(matrix[1][1]))
-    fd.close()
+# ''' Function that outputs the confusion matrix for the predicted and real labels given '''
+# def get_confusion_matrix(predictions, labels):
+#     matrix = [[0, 0], [0, 0]]
+#     labels_f = labels.flatten()
+#     for i in range(len(predictions)):
+#         matrix[labels_f[i].item()][predictions[i].item()] += 1
+#     fd = open('conf_matrix.txt', 'w')
+#     fd.write(str(matrix[0][0]) + ' ' + str(matrix[0][1]) + ' ' + str(matrix[1][0]) + ' ' + str(matrix[1][1]))
+#     fd.close()
 
 
 
@@ -96,10 +99,11 @@ def train_and_test():
 
 
     #  Initialialize the normalization function
-    #  These values are obtained using data_formatter.get_numeric_values()
-    #  They are hardcoded because it's redundant to be computed every time.
-    norm = transforms.Normalize(mean = [-47.41110035071766], std = [21.863642215782225])
-
+    # norm = transforms.Normalize(mean = [-47.41110035071766], std = [21.863642215782225])
+    # because there are significantly more objects
+    m = np.load('temp/test_mels_150/test.npy')
+    norm = transforms.Normalize(mean = np.mean(m), std=np.std(m))
+    del m
 
     #  Normalizing values accross all images
     for i in range(train_batches):
@@ -125,15 +129,15 @@ def train_and_test():
 
     metrics = {"f1":[], "ROC_AUC":[], "accuracy":[], "loss":[]}
 
-    #  https://github.com/andreiarnautu/Sudoku-Solver/blob/master/train.py
     
     for epoch in range(epochs):
         running_loss = 0.0
         #  Train mode
         print_offset = train_batches // 5
+
+        net.train()
         for i in range(train_batches):
             inputs, labels = train_images[i], train_labels[i]
-            net.train()
             outputs = net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
@@ -148,9 +152,10 @@ def train_and_test():
         correct = 0
         total = 0
         with torch.no_grad():
+            
+            net.eval()
             for i in range(train_batches):
                 inputs, labels = train_images[i], train_labels[i]
-                net.eval()
                 outputs = net(inputs)
                 _, predicted = torch.max(outputs.data, 1)
                 loss = criterion(outputs, labels)
@@ -165,10 +170,10 @@ def train_and_test():
         validation_loss = 0
         predictions = torch.zeros(validation_samples, dtype = torch.long)
         index = 0
+        net.eval()
         with torch.no_grad():
             for i in range(validation_batches):
                 inputs, labels = validation_images[i], validation_labels[i]
-                net.eval()
                 outputs = net(inputs)
                 predicted = torch.max(outputs.data, 1).indices
                 loss = criterion(outputs, labels)
@@ -178,7 +183,7 @@ def train_and_test():
                 for j in range(index, index + batch_size):
                     predictions[j] = predicted[j - index]
                 index += batch_size
-        get_confusion_matrix(predictions, validation_labels)
+        # get_confusion_matrix(predictions, validation_labels)
         
         lb = validation_labels.reshape(predictions.shape)
         f1 = binary_f1_score(predictions.cuda(), lb.cuda())
@@ -229,10 +234,9 @@ def train_and_test():
                 predictions[j] = predicted[j - index]
             index += batch_size
 
-    testing_file_names = get_testing_files()
+    testing_file_names = get_test_files()
     write_predicted(testing_file_names, predictions, 'submission.txt')
 
 
 if __name__ == '__main__':
-    # data_formatter.audio_to_images_librosa()
     train_and_test()

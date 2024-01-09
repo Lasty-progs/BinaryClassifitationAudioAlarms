@@ -4,7 +4,7 @@ import pandas as pd
 
 
 CLASSIFICATION_CLASS = "Alarm" # Chose one class from vocabulary.csv
-SIZE_IMAGES = (300,300)
+SIZE_IMAGES = (150,150)
 
 
 def get_file_names() -> dict:
@@ -29,7 +29,9 @@ def get_dev_labels(classification_class:str):
     '''Classification class chose from vocabulary.csv'''
 
     files = get_file_names()['dev']
-    df = pd.read_csv("./FSD50K/ground_truth/dev.csv")
+    
+    # Reverse because many corrupted files in start of base
+    df = pd.read_csv("./FSD50K/ground_truth/dev.csv") #.iloc[::-1]
 
     train_count, val_count = count_true_examples(df, classification_class)
 
@@ -39,16 +41,25 @@ def get_dev_labels(classification_class:str):
     for _, row in df.iterrows():
         fname = str(row['fname'])+".wav"
         if (fname) in files:
-            if row['split'] == "train" and train_count > 0:
-                train_info['names'].append("FSD50K/dev_audio/" + fname)
+            if row['split'] == "train":
                 categories = row['labels'].split(',')
-                train_count -= 0 if classification_class in categories else 1
-                train_info['labels'].append(classification_class in categories)
-            elif row['split'] == "val" and val_count > 0:
-                validation_info['names'].append("FSD50K/dev_audio/" + fname)
+                if classification_class in categories:     
+                    train_info['names'].append("FSD50K/dev_audio/" + fname)
+                    train_info['labels'].append(1)
+                elif train_count > 0:
+                    train_count -= 1
+                    train_info['names'].append("FSD50K/dev_audio/" + fname)
+                    train_info['labels'].append(0)
+
+            elif row['split'] == "val":       
                 categories = row['labels'].split(',')
-                val_count -= 0 if classification_class in categories else 1
-                validation_info['labels'].append(classification_class in categories)
+                if classification_class in categories:
+                    validation_info['names'].append("FSD50K/dev_audio/" + fname)
+                    validation_info['labels'].append(1)
+                elif val_count > 0:
+                    val_count -= 1
+                    validation_info['names'].append("FSD50K/dev_audio/" + fname)
+                    validation_info['labels'].append(0)
 
     return (train_info['names'], train_info['labels'],
             validation_info['names'], validation_info['labels'])
@@ -89,10 +100,9 @@ def get_melspectrogram(path, fixed_width = 150, fixed_height = 150):
 
     return spectrogram[:, :fixed_width]
 
-def clear_empty(dataset, empty, size):
-    '''Clear empty data'''
+def clear_test(dataset, empty, size):
+    '''Clear empty test images'''
     cleared = np.zeros((len(dataset) - empty, size[0], size[1]))
-    zeroes = np.zeros((size[0], size[1]))
     counter = 0
     for i in dataset:
         if i.any():
@@ -100,7 +110,19 @@ def clear_empty(dataset, empty, size):
             counter += 1 
     return cleared
 
-def generate_melspectrogramms(file_names, size):
+def clear_empty(dataset, labels, empty, size):
+    '''Clear empty test images'''
+    cleared = np.zeros((len(dataset) - empty, size[0], size[1]))
+    labels_cleared = np.zeros((len(dataset) - empty))
+    counter = 0
+    for i, elem in enumerate(dataset):
+        if elem.any():
+            cleared[counter] = elem
+            labels_cleared[counter] = labels[i]
+            counter += 1 
+    return cleared, labels_cleared
+
+def generate_melspectrogramms(file_names, size, labels = None):
     '''Get cleared melspecrogramms of all dataset'''
     data = np.zeros((len(file_names), size[0], size[1]))
     empty = 0
@@ -109,9 +131,12 @@ def generate_melspectrogramms(file_names, size):
             data[i] = get_melspectrogram(file_name, fixed_height=size[0], fixed_width=size[1])
         except EOFError:
             empty += 1
-    cleared = clear_empty(data, empty, size)
-    return cleared
-
+    if labels:
+        cleared, labels = clear_empty(data, labels, empty, size)
+        return cleared, labels
+    else:
+        cleared = clear_test(data, empty, size)
+        return cleared
 
 #  This functions generates and saves the melspectrograms used by the neural network.
 def audio_to_images_librosa(size:tuple):
@@ -121,10 +146,10 @@ def audio_to_images_librosa(size:tuple):
     generate_folders()
 
     print('Generating melspectrograms for training...')
-    training_images = generate_melspectrogramms(training_file_names, size)
+    training_images, training_labels = generate_melspectrogramms(training_file_names, size, training_labels)
 
     print('Generating melspectrograms for validation...')
-    validation_images = generate_melspectrogramms(validation_file_names, size)
+    validation_images, validation_labels = generate_melspectrogramms(validation_file_names, size, validation_labels)
 
 
     print('Generating melspectrograms for testing...')
@@ -140,6 +165,8 @@ def audio_to_images_librosa(size:tuple):
     #  Save labels
     np.save('temp/train_mels_150/train_labels.npy', np.asarray(training_labels, dtype = 'int'))
     np.save('temp/validation_mels_150/validation_labels.npy', np.asarray(validation_labels, dtype = 'int'))
+
+    np.save('temp/len.npy', np.asarray([training_images.shape[0], validation_images.shape[0], testing_images.shape[0]], dtype = 'int'))
 
 
 if __name__ == '__main__':
