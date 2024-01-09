@@ -6,10 +6,16 @@ from scipy.signal import spectrogram
 
 
 
-train_img = np.load('train_mels_150/train.npy')[123]
+train_img = np.load('temp/validation_mels_150/validation.npy')
 
-# print(train_img.shape)
-mini = np.min(train_img)
+print(train_img.shape)
+
+# plt.imsave("test_mell.jpg", train_img, cmap='viridis')
+
+
+
+
+# mini = np.min(train_img)
 
 # for i in train_img:
 #     print(i)
@@ -18,12 +24,10 @@ mini = np.min(train_img)
 
 
 
-signal, sample_rate = librosa.load("fsd50K/audio/test/125520.wav", sr=16000)
-hop_length = int(signal.shape[0] / (150 * 1.1))
-spectrogram = librosa.feature.melspectrogram(y=signal,n_mels = 150, hop_length = hop_length)
-spectrogram = librosa.power_to_db(spectrogram)
-# spectr += 50
-# print(spectr.shape)
+# signal, sample_rate = librosa.load("FSD50K/dev_audio/236.wav", sr=16000)
+# spectrogram = librosa.feature.melspectrogram(y=signal,n_mels = 500, hop_length = 500)
+# spectrogram = librosa.power_to_db(spectrogram)
+# print(spectrogram.size)
 
 
-plt.imsave("test_mell.jpg", spectrogram, cmap='viridis')
+# plt.imsave("test_mell.jpg", spectrogram, cmap='viridis')
